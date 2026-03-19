@@ -1,0 +1,18 @@
+{
+  "name": "jrose11-stat-tracker",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "seed:pokemon": "tsx scripts/seed-pokemon.ts",
+    "seed:youtube": "tsx scripts/seed-youtube.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
