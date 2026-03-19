@@ -283,6 +283,38 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- =============================================================
+-- Grants
+-- Tables created via SQL migration don't get automatic anon/authenticated
+-- grants — those only happen when using the Supabase dashboard UI.
+-- =============================================================
+
+-- Reference tables (no RLS — grant SELECT to all roles)
+GRANT SELECT ON TABLE pokemon       TO anon, authenticated;
+GRANT SELECT ON TABLE moves         TO anon, authenticated;
+GRANT SELECT ON TABLE pokemon_moves TO anon, authenticated;
+
+-- User-facing tables — anon can read public data; write access via RLS policies
+GRANT SELECT, INSERT, UPDATE        ON TABLE profiles               TO authenticated;
+GRANT SELECT                        ON TABLE profiles               TO anon;
+GRANT SELECT                        ON TABLE runs                   TO anon, authenticated;
+GRANT INSERT, UPDATE                ON TABLE runs                   TO authenticated;
+GRANT SELECT                        ON TABLE run_moves              TO anon, authenticated;
+GRANT UPDATE                        ON TABLE run_moves              TO authenticated;
+GRANT SELECT                        ON TABLE run_gyms               TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE run_gyms              TO authenticated;
+GRANT SELECT                        ON TABLE glitch_votes           TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE        ON TABLE glitch_votes           TO authenticated;
+GRANT SELECT                        ON TABLE custom_field_definitions TO anon, authenticated;
+GRANT INSERT, UPDATE                ON TABLE custom_field_definitions TO authenticated;
+GRANT SELECT                        ON TABLE custom_field_values    TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE        ON TABLE custom_field_values    TO authenticated;
+GRANT SELECT, INSERT                ON TABLE community_notes        TO anon;
+GRANT SELECT, INSERT, UPDATE        ON TABLE community_notes        TO authenticated;
+
+-- Sequences (needed for SERIAL inserts)
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- =============================================================
 -- Row-Level Security
 -- =============================================================
 

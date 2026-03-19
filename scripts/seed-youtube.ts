@@ -12,7 +12,7 @@
  */
 
 import 'dotenv/config'
-import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3'
 
@@ -218,32 +218,23 @@ async function fetchAllPlaylistItems(
 // ---------------------
 
 async function main() {
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const dbUrl = process.env.SUPABASE_DB_URL
   const apiKey = process.env.YOUTUBE_API_KEY
   const playlistId = process.env.YOUTUBE_PLAYLIST_ID
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env')
-  }
+  if (!dbUrl) throw new Error('SUPABASE_DB_URL must be set in .env')
   if (!apiKey || !playlistId) {
     throw new Error('YOUTUBE_API_KEY and YOUTUBE_PLAYLIST_ID must be set in .env')
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const sql = postgres(dbUrl, { ssl: 'require' })
 
-  // Load Pokémon names from the DB (seeded by seed-pokemon.ts)
+  // Load Pokémon names from the DB
   console.log('Loading Pokémon names from database...')
-  const { data: pokemon, error: pokemonErr } = await supabase
-    .from('pokemon')
-    .select('dex_number, name')
-    .order('dex_number')
-  if (pokemonErr) throw new Error(`Failed to load Pokémon: ${pokemonErr.message}`)
-  if (!pokemon?.length) throw new Error('No Pokémon in database — run seed-pokemon.ts first')
+  const pokemon = await sql<PokemonRow[]>`SELECT dex_number, name FROM pokemon ORDER BY dex_number`
+  if (!pokemon.length) throw new Error('No Pokémon in database — run seed-pokemon.ts first')
 
-  const lookup = buildLookup(pokemon as PokemonRow[])
+  const lookup = buildLookup(pokemon)
   console.log(`Built name lookup with ${lookup.length} aliases for ${pokemon.length} Pokémon`)
 
   // Fetch playlist
@@ -268,22 +259,18 @@ async function main() {
 
     for (const result of results) {
       for (const dexNumber of result.dexNumbers) {
-        const { error } = await supabase
-          .from('runs')
-          .update({ youtube_url: youtubeUrl })
-          .eq('pokemon_id', dexNumber)
-          .eq('status', 'stub')  // don't touch runs contributors have started filling
-
-        if (error) {
-          console.error(`  Error updating #${dexNumber} (${result.apiName}): ${error.message}`)
-        } else {
-          matched++
-          const dexStr = String(dexNumber).padStart(3, '0')
-          console.log(`  #${dexStr} ${result.apiName.padEnd(14)} ← matched "${result.matchedAlias}"`)
-        }
+        await sql`
+          UPDATE runs SET youtube_url = ${youtubeUrl}
+          WHERE pokemon_id = ${dexNumber} AND status = 'stub'
+        `
+        matched++
+        const dexStr = String(dexNumber).padStart(3, '0')
+        console.log(`  #${dexStr} ${result.apiName.padEnd(14)} ← matched "${result.matchedAlias}"`)
       }
     }
   }
+
+  await sql.end()
 
   console.log('\n✓ YouTube sync complete')
   console.log(`  ${matched} run stubs updated with YouTube links`)
