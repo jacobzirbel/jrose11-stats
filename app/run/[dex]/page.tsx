@@ -1,6 +1,7 @@
 import { createSupabaseServer } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { RunEditor } from './run-editor'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default async function RunPage({ params }: Props) {
 
   const supabase = await createSupabaseServer()
 
+  // Fetch run + pokemon
   const { data: run } = await supabase
     .from('runs')
     .select('*, pokemon(dex_number, name, sprite_url, type1, type2, is_glitch)')
@@ -23,9 +25,37 @@ export default async function RunPage({ params }: Props) {
 
   if (!run) notFound()
 
+  // Fetch moves for this run (joined with move names)
+  const { data: runMoves } = await supabase
+    .from('run_moves')
+    .select('move_id, used, moves(name, category)')
+    .eq('run_id', run.id)
+    .order('move_id')
+
+  // Check if current user can edit
+  const { data: { user } } = await supabase.auth.getUser()
+  let canEdit = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile) {
+      canEdit = ['contributor', 'trusted_contributor', 'admin'].includes(profile.role)
+    }
+  }
+
   const pokemon = run.pokemon as any
   const displayName = pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1).replace(/-/g, ' ')
   const dexStr = pokemon.is_glitch ? '#000' : `#${String(pokemon.dex_number).padStart(3, '0')}`
+
+  const moves = (runMoves ?? []).map((rm: any) => ({
+    move_id: rm.move_id as number,
+    name: rm.moves.name as string,
+    category: rm.moves.category as string | null,
+    used: rm.used as boolean,
+  }))
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
@@ -57,39 +87,13 @@ export default async function RunPage({ params }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <Field label="Erika Skipped" value={run.erika_skipped} />
-        <Field label="Erika Joked" value={run.erika_joked} />
-        <Field label="Badge Boost Glitch" value={run.badge_boost_glitch} />
-        <Field label="Brock Time" value={run.brock_finish_seconds ? formatTime(run.brock_finish_seconds) : null} note={run.brock_time_estimated ? '(estimated)' : undefined} />
-        <Field label="Final Level" value={run.final_level} />
-        <Field label="Completion Time" value={run.completion_seconds ? formatTime(run.completion_seconds) : null} />
-        <Field label="jrose Tier" value={run.jrose_tier ? `${run.jrose_tier} #${run.jrose_tier_position}` : null} />
-      </div>
+      <RunEditor
+        runId={run.id}
+        brockFinishSeconds={run.brock_finish_seconds}
+        brockTimeEstimated={run.brock_time_estimated}
+        moves={moves}
+        canEdit={canEdit}
+      />
     </main>
   )
-}
-
-function Field({ label, value, note }: { label: string; value: any; note?: string }) {
-  return (
-    <div className="bg-gray-800/50 rounded-lg p-3">
-      <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">{label}</div>
-      <div className={value != null ? 'text-white' : 'text-gray-600 italic'}>
-        {value != null ? (
-          typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)
-        ) : (
-          'Not set'
-        )}
-        {note && <span className="text-gray-500 ml-1 text-xs">{note}</span>}
-      </div>
-    </div>
-  )
-}
-
-function formatTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${m}:${String(s).padStart(2, '0')}`
 }
