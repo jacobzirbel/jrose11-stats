@@ -230,7 +230,9 @@ async function main() {
     throw new Error('YOUTUBE_API_KEY and YOUTUBE_PLAYLIST_ID must be set in .env')
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
 
   // Load Pokémon names from the DB (seeded by seed-pokemon.ts)
   console.log('Loading Pokémon names from database...')

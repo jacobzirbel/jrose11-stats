@@ -30,11 +30,12 @@ CREATE TABLE profiles (
 -- ---------------------
 
 CREATE TABLE pokemon (
-  dex_number  INTEGER PRIMARY KEY CHECK (dex_number BETWEEN 1 AND 151),
+  dex_number  INTEGER PRIMARY KEY CHECK (dex_number BETWEEN 0 AND 151),
   name        TEXT NOT NULL,
   sprite_url  TEXT,
   type1       TEXT NOT NULL,  -- e.g. 'fire'
-  type2       TEXT            -- nullable; second type
+  type2       TEXT,           -- nullable; second type
+  is_glitch   BOOLEAN NOT NULL DEFAULT FALSE  -- TRUE for MissingNo. and any future glitch entries
 );
 
 -- ---------------------
@@ -286,9 +287,8 @@ CREATE TRIGGER on_auth_user_created
 -- =============================================================
 
 ALTER TABLE profiles               ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pokemon                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE moves                  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pokemon_moves          ENABLE ROW LEVEL SECURITY;
+-- pokemon, moves, pokemon_moves are immutable reference data seeded once.
+-- No RLS needed — public read is the default when RLS is off.
 ALTER TABLE runs                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE run_moves              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE run_gyms               ENABLE ROW LEVEL SECURITY;
@@ -312,10 +312,6 @@ $$;
 -- ---------------------
 -- pokemon / moves / pokemon_moves: public read, no public write (seeded by service role)
 -- ---------------------
-
-CREATE POLICY "public read pokemon"       ON pokemon         FOR SELECT USING (TRUE);
-CREATE POLICY "public read moves"         ON moves           FOR SELECT USING (TRUE);
-CREATE POLICY "public read pokemon_moves" ON pokemon_moves   FOR SELECT USING (TRUE);
 
 -- ---------------------
 -- profiles
