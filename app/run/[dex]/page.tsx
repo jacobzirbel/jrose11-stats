@@ -33,7 +33,7 @@ export default async function RunPage({ params }: Props) {
   ] = await Promise.all([
     supabase
       .from('run_moves')
-      .select('move_id, used, moves(name, category)')
+      .select('move_id, used, moves(name)')
       .eq('run_id', run.id)
       .order('move_id'),
     supabase
@@ -72,7 +72,6 @@ export default async function RunPage({ params }: Props) {
   const moves = (runMoves ?? []).map((rm: any) => ({
     move_id: rm.move_id as number,
     name: rm.moves.name as string,
-    category: rm.moves.category as string | null,
     used: rm.used as boolean,
   }))
 

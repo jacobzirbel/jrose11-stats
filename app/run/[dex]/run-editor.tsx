@@ -6,7 +6,6 @@ import { useState } from 'react'
 interface Move {
   move_id: number
   name: string
-  category: string | null
   used: boolean
 }
 
@@ -25,11 +24,6 @@ interface Props {
   canEdit: boolean
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  physical: 'bg-red-900/30 text-red-300',
-  special: 'bg-blue-900/30 text-blue-300',
-  status: 'bg-gray-700/50 text-gray-300',
-}
 
 export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit }: Props) {
   const [moves, setMoves] = useState(initialMoves)
@@ -109,21 +103,12 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
       )}
 
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">
-            Moves
-            <span className="text-sm font-normal text-gray-400 ml-2">
-              {moves.filter((m) => m.used).length} used / {moves.length} learnable
-            </span>
-          </h2>
-          <input
-            type="text"
-            placeholder="Search moves..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-40 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <h2 className="text-lg font-semibold mb-3">
+          Moves
+          <span className="text-sm font-normal text-gray-400 ml-2">
+            {moves.filter((m) => m.used).length} used / {moves.length} learnable
+          </span>
+        </h2>
 
         {usedMoves.length > 0 && (
           <div className="mb-4">
@@ -143,10 +128,19 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
         )}
 
         <div>
-          <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-            {canEdit ? 'Click to mark as used' : 'Not used'}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-gray-500 uppercase tracking-wide">
+              {canEdit ? 'Click to mark as used' : 'Not used'}
+            </div>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-36 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="h-40 overflow-y-auto rounded-lg bg-gray-900/50 border border-gray-800 p-2 flex flex-wrap gap-1.5 content-start">
             {unusedMoves.map((move) => (
               <MoveChip
                 key={move.move_id}
@@ -156,6 +150,11 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
                 onClick={() => toggleMove(move.move_id)}
               />
             ))}
+            {unusedMoves.length === 0 && (
+              <span className="text-xs text-gray-600 italic">
+                {search ? 'No matches' : 'All moves used'}
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -355,7 +354,6 @@ function TimeFieldRow({
 
 function MoveChip({ move, canEdit, saving, onClick }: { move: Move; canEdit: boolean; saving: boolean; onClick: () => void }) {
   const displayName = move.name.replace(/-/g, ' ')
-  const categoryClass = CATEGORY_COLORS[move.category ?? ''] ?? 'bg-gray-800 text-gray-400'
 
   return (
     <button
@@ -365,12 +363,12 @@ function MoveChip({ move, canEdit, saving, onClick }: { move: Move; canEdit: boo
         px-2 py-1 rounded text-xs font-medium transition-all
         ${move.used
           ? 'bg-green-900/50 text-green-300 border border-green-700'
-          : `${categoryClass} border border-transparent opacity-60 hover:opacity-100`
+          : 'bg-gray-800 text-gray-400 border border-transparent opacity-60 hover:opacity-100'
         }
         ${canEdit ? 'cursor-pointer' : 'cursor-default'}
         ${saving ? 'animate-pulse' : ''}
       `}
-      title={`${displayName}${move.category ? ` (${move.category})` : ''}`}
+      title={displayName}
     >
       {displayName}
     </button>
