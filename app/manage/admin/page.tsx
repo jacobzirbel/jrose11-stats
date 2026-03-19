@@ -26,5 +26,11 @@ export default async function AdminPage() {
       .order('pokemon_id'),
   ])
 
-  return <AdminManager users={users ?? []} completeRuns={completeRuns ?? []} />
+  const runs = (completeRuns ?? []).map((r: any) => ({
+    id: r.id as number,
+    status: r.status as string,
+    pokemon: r.pokemon as { name: string; dex_number: number; is_glitch: boolean },
+  }))
+
+  return <AdminManager users={users ?? []} completeRuns={runs} />
 }
