@@ -26,6 +26,11 @@ export async function Nav() {
         <div className="flex items-center gap-3 text-sm">
           {profile ? (
             <>
+              {['contributor', 'admin'].includes(profile.role) && (
+                <Link href="/manage" className="text-gray-400 hover:text-white">
+                  Manage
+                </Link>
+              )}
               <span className="text-gray-400">
                 {profile.username}
                 <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">

@@ -117,6 +117,12 @@ export default async function RunPage({ params }: Props) {
         </div>
       )}
 
+      {!canEdit && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-sm text-gray-400">
+          You are not a contributor, so there isn&apos;t much to see or do here. Check back later!
+        </div>
+      )}
+
       <div className="space-y-8">
         <GymOrder
           runId={run.id}
