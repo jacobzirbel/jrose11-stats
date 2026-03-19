@@ -1,4 +1,4 @@
-import { createSupabaseServer } from '@/lib/supabase'
+import { createSupabaseServer } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -13,7 +13,7 @@ export default async function RunPage({ params }: Props) {
   const dexNumber = parseInt(dex, 10)
   if (isNaN(dexNumber) || dexNumber < 0 || dexNumber > 151) notFound()
 
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
 
   const { data: run } = await supabase
     .from('runs')
