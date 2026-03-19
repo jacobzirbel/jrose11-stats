@@ -147,6 +147,7 @@ export default async function Home({ searchParams }: Props) {
             <Link
               key={p.dex_number}
               href={`/run/${p.dex_number}`}
+              prefetch={false}
               className={`
                 group relative rounded-lg border p-1.5 text-center
                 transition-all hover:scale-105 hover:ring-2 hover:ring-white/20
