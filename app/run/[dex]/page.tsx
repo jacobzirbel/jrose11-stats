@@ -2,6 +2,7 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RunEditor } from './run-editor'
+import { GymOrder } from './gym-order'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ export default async function RunPage({ params }: Props) {
     { data: runMoves },
     { data: customFieldValues },
     { data: allActiveFields },
+    { data: runGyms },
   ] = await Promise.all([
     supabase
       .from('run_moves')
@@ -43,6 +45,11 @@ export default async function RunPage({ params }: Props) {
       .select('id, name, field_type, enum_options')
       .eq('status', 'active')
       .order('id'),
+    supabase
+      .from('run_gyms')
+      .select('sequence_position, gym_number')
+      .eq('run_id', run.id)
+      .order('sequence_position'),
   ])
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -111,12 +118,19 @@ export default async function RunPage({ params }: Props) {
         </div>
       )}
 
-      <RunEditor
-        runId={run.id}
-        moves={moves}
-        customFields={customFields}
-        canEdit={canEdit}
-      />
+      <div className="space-y-8">
+        <GymOrder
+          runId={run.id}
+          gymRows={runGyms ?? []}
+          canEdit={canEdit}
+        />
+        <RunEditor
+          runId={run.id}
+          moves={moves}
+          customFields={customFields}
+          canEdit={canEdit}
+        />
+      </div>
     </main>
   )
 }
