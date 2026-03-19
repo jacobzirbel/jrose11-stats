@@ -15,6 +15,7 @@ export default async function Home() {
   return (
     <main style={{ fontFamily: 'monospace', padding: '2rem' }}>
       <h1>jrose11 Gen 1 Stat Tracker</h1>
+      <p>URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'MISSING'}</p>
       {error ? (
         <p>⚠ Error: {error.message} (code: {error.code})</p>
       ) : (
