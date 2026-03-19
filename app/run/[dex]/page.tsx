@@ -16,7 +16,6 @@ export default async function RunPage({ params }: Props) {
 
   const supabase = await createSupabaseServer()
 
-  // Fetch run + pokemon
   const { data: run } = await supabase
     .from('runs')
     .select('*, pokemon(dex_number, name, sprite_url, type1, type2, is_glitch)')
@@ -25,14 +24,27 @@ export default async function RunPage({ params }: Props) {
 
   if (!run) notFound()
 
-  // Fetch moves for this run (joined with move names)
-  const { data: runMoves } = await supabase
-    .from('run_moves')
-    .select('move_id, used, moves(name, category)')
-    .eq('run_id', run.id)
-    .order('move_id')
+  const [
+    { data: runMoves },
+    { data: customFieldValues },
+    { data: allActiveFields },
+  ] = await Promise.all([
+    supabase
+      .from('run_moves')
+      .select('move_id, used, moves(name, category)')
+      .eq('run_id', run.id)
+      .order('move_id'),
+    supabase
+      .from('custom_field_values')
+      .select('field_definition_id, value')
+      .eq('run_id', run.id),
+    supabase
+      .from('custom_field_definitions')
+      .select('id, name, field_type, enum_options')
+      .eq('status', 'active')
+      .order('id'),
+  ])
 
-  // Check if current user can edit
   const { data: { user } } = await supabase.auth.getUser()
   let canEdit = false
   if (user) {
@@ -42,7 +54,7 @@ export default async function RunPage({ params }: Props) {
       .eq('id', user.id)
       .single()
     if (profile) {
-      canEdit = ['contributor', 'trusted_contributor', 'admin'].includes(profile.role)
+      canEdit = ['contributor', 'admin'].includes(profile.role)
     }
   }
 
@@ -55,6 +67,18 @@ export default async function RunPage({ params }: Props) {
     name: rm.moves.name as string,
     category: rm.moves.category as string | null,
     used: rm.used as boolean,
+  }))
+
+  const valuesByFieldId = Object.fromEntries(
+    (customFieldValues ?? []).map((v: any) => [v.field_definition_id, v.value])
+  )
+
+  const customFields = (allActiveFields ?? []).map((f: any) => ({
+    field_definition_id: f.id as number,
+    name: f.name as string,
+    field_type: f.field_type as 'boolean' | 'text' | 'number' | 'enum' | 'time',
+    enum_options: f.enum_options as string[] | null,
+    value: valuesByFieldId[f.id] ?? null,
   }))
 
   return (
@@ -89,9 +113,8 @@ export default async function RunPage({ params }: Props) {
 
       <RunEditor
         runId={run.id}
-        brockFinishSeconds={run.brock_finish_seconds}
-        brockTimeEstimated={run.brock_time_estimated}
         moves={moves}
+        customFields={customFields}
         canEdit={canEdit}
       />
     </main>

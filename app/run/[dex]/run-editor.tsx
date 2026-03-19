@@ -10,11 +10,18 @@ interface Move {
   used: boolean
 }
 
+interface CustomFieldValue {
+  field_definition_id: number
+  name: string
+  field_type: 'boolean' | 'text' | 'number' | 'enum' | 'time'
+  enum_options: string[] | null
+  value: unknown
+}
+
 interface Props {
   runId: number
-  brockFinishSeconds: number | null
-  brockTimeEstimated: boolean
   moves: Move[]
+  customFields: CustomFieldValue[]
   canEdit: boolean
 }
 
@@ -24,11 +31,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   status: 'bg-gray-700/50 text-gray-300',
 }
 
-export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves: initialMoves, canEdit }: Props) {
+export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit }: Props) {
   const [moves, setMoves] = useState(initialMoves)
-  const [brockMinutes, setBrockMinutes] = useState(brockFinishSeconds != null ? Math.floor(brockFinishSeconds / 60).toString() : '')
-  const [brockSeconds, setBrockSeconds] = useState(brockFinishSeconds != null ? (brockFinishSeconds % 60).toString().padStart(2, '0') : '')
-  const [estimated, setEstimated] = useState(brockTimeEstimated)
+  const [customFields, setCustomFields] = useState(initialCustomFields)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,36 +57,22 @@ export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves
 
     if (err) {
       setError(`Failed to update move: ${err.message}`)
-      setMoves(moves) // revert
+      setMoves(moves)
     }
     setSaving(null)
   }
 
-  async function saveBrockTime() {
+  async function saveCustomField(defId: number, value: unknown) {
     if (!canEdit) return
-    setSaving('brock')
+    setCustomFields(customFields.map((f) => f.field_definition_id === defId ? { ...f, value } : f))
+    setSaving(`field-${defId}`)
     setError(null)
 
-    const mins = parseInt(brockMinutes, 10) || 0
-    const secs = parseInt(brockSeconds, 10) || 0
-    const totalSeconds = mins * 60 + secs
+    const { error: err } = await supabase
+      .from('custom_field_values')
+      .upsert({ run_id: runId, field_definition_id: defId, value })
 
-    if (totalSeconds === 0 && brockMinutes === '' && brockSeconds === '') {
-      // Clear the field
-      const { error: err } = await supabase
-        .from('runs')
-        .update({ brock_finish_seconds: null, brock_time_estimated: false })
-        .eq('id', runId)
-
-      if (err) setError(`Failed to save: ${err.message}`)
-    } else {
-      const { error: err } = await supabase
-        .from('runs')
-        .update({ brock_finish_seconds: totalSeconds, brock_time_estimated: estimated })
-        .eq('id', runId)
-
-      if (err) setError(`Failed to save: ${err.message}`)
-    }
+    if (err) setError(`Failed to save: ${err.message}`)
     setSaving(null)
   }
 
@@ -100,61 +91,23 @@ export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves
         </div>
       )}
 
-      {/* Brock Time */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Brock Finish Time</h2>
-        {canEdit ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={0}
-              placeholder="MM"
-              value={brockMinutes}
-              onChange={(e) => setBrockMinutes(e.target.value)}
-              className="w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-gray-500">:</span>
-            <input
-              type="number"
-              min={0}
-              max={59}
-              placeholder="SS"
-              value={brockSeconds}
-              onChange={(e) => setBrockSeconds(e.target.value)}
-              className="w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <label className="flex items-center gap-1.5 text-sm text-gray-400 ml-2">
-              <input
-                type="checkbox"
-                checked={estimated}
-                onChange={(e) => setEstimated(e.target.checked)}
-                className="rounded bg-gray-800 border-gray-600"
+      {customFields.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Details</h2>
+          <div className="space-y-3">
+            {customFields.map((f) => (
+              <CustomFieldRow
+                key={f.field_definition_id}
+                field={f}
+                canEdit={canEdit}
+                saving={saving === `field-${f.field_definition_id}`}
+                onChange={(val) => saveCustomField(f.field_definition_id, val)}
               />
-              Estimated
-            </label>
-            <button
-              onClick={saveBrockTime}
-              disabled={saving === 'brock'}
-              className="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded text-sm font-medium transition-colors"
-            >
-              {saving === 'brock' ? 'Saving...' : 'Save'}
-            </button>
+            ))}
           </div>
-        ) : (
-          <div className="bg-gray-800/50 rounded-lg p-3 text-sm">
-            {brockFinishSeconds != null ? (
-              <span>
-                {Math.floor(brockFinishSeconds / 60)}:{String(brockFinishSeconds % 60).padStart(2, '0')}
-                {brockTimeEstimated && <span className="text-gray-500 ml-1">(estimated)</span>}
-              </span>
-            ) : (
-              <span className="text-gray-600 italic">Not set</span>
-            )}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* Moves */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">
@@ -172,7 +125,6 @@ export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves
           />
         </div>
 
-        {/* Used moves first */}
         {usedMoves.length > 0 && (
           <div className="mb-4">
             <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">Used</div>
@@ -190,7 +142,6 @@ export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves
           </div>
         )}
 
-        {/* Unused moves */}
         <div>
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">
             {canEdit ? 'Click to mark as used' : 'Not used'}
@@ -211,6 +162,196 @@ export function RunEditor({ runId, brockFinishSeconds, brockTimeEstimated, moves
     </div>
   )
 }
+
+// ---------------------
+// CustomFieldRow
+// ---------------------
+
+function CustomFieldRow({
+  field, canEdit, saving, onChange,
+}: {
+  field: CustomFieldValue
+  canEdit: boolean
+  saving: boolean
+  onChange: (val: unknown) => void
+}) {
+  if (field.field_type === 'boolean') {
+    const checked = field.value === true
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-400 w-36">{field.name}</span>
+        {canEdit ? (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={saving}
+              onChange={(e) => onChange(e.target.checked)}
+              className="rounded bg-gray-800 border-gray-600 w-4 h-4"
+            />
+            {saving && <span className="text-xs text-gray-500">Saving...</span>}
+          </label>
+        ) : (
+          <span className="text-sm">{checked ? 'Yes' : 'No'}</span>
+        )}
+      </div>
+    )
+  }
+
+  if (field.field_type === 'time') {
+    return (
+      <TimeFieldRow
+        name={field.name}
+        value={field.value as { seconds: number; estimated: boolean } | null}
+        canEdit={canEdit}
+        saving={saving}
+        onChange={onChange}
+      />
+    )
+  }
+
+  if (field.field_type === 'number') {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-400 w-36">{field.name}</span>
+        {canEdit ? (
+          <input
+            type="number"
+            defaultValue={(field.value as number) ?? ''}
+            onBlur={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+            disabled={saving}
+            className="w-24 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        ) : (
+          <span className="text-sm">{(field.value as number) ?? <span className="text-gray-600 italic">—</span>}</span>
+        )}
+      </div>
+    )
+  }
+
+  if (field.field_type === 'enum' && field.enum_options) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-400 w-36">{field.name}</span>
+        {canEdit ? (
+          <select
+            defaultValue={(field.value as string) ?? ''}
+            onChange={(e) => onChange(e.target.value || null)}
+            disabled={saving}
+            className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">—</option>
+            {field.enum_options.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-sm">{(field.value as string) ?? <span className="text-gray-600 italic">—</span>}</span>
+        )}
+      </div>
+    )
+  }
+
+  // text
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-gray-400 w-36">{field.name}</span>
+      {canEdit ? (
+        <input
+          type="text"
+          defaultValue={(field.value as string) ?? ''}
+          onBlur={(e) => onChange(e.target.value || null)}
+          disabled={saving}
+          className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+        />
+      ) : (
+        <span className="text-sm">{(field.value as string) ?? <span className="text-gray-600 italic">—</span>}</span>
+      )}
+    </div>
+  )
+}
+
+function TimeFieldRow({
+  name, value, canEdit, saving, onChange,
+}: {
+  name: string
+  value: { seconds: number; estimated: boolean } | null
+  canEdit: boolean
+  saving: boolean
+  onChange: (val: unknown) => void
+}) {
+  const initSeconds = value?.seconds ?? null
+  const [minutes, setMinutes] = useState(initSeconds != null ? Math.floor(initSeconds / 60).toString() : '')
+  const [secs, setSecs] = useState(initSeconds != null ? String(initSeconds % 60).padStart(2, '0') : '')
+  const [estimated, setEstimated] = useState(value?.estimated ?? false)
+
+  function handleSave() {
+    if (minutes === '' && secs === '') {
+      onChange(null)
+    } else {
+      const m = parseInt(minutes, 10) || 0
+      const s = parseInt(secs, 10) || 0
+      onChange({ seconds: m * 60 + s, estimated })
+    }
+  }
+
+  if (!canEdit) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-400 w-36">{name}</span>
+        <span className="text-sm">
+          {value?.seconds != null
+            ? `${Math.floor(value.seconds / 60)}:${String(value.seconds % 60).padStart(2, '0')}${value.estimated ? ' (est.)' : ''}`
+            : <span className="text-gray-600 italic">—</span>}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-400 w-36">{name}</span>
+      <input
+        type="number"
+        min={0}
+        placeholder="MM"
+        value={minutes}
+        onChange={(e) => setMinutes(e.target.value)}
+        className="w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <span className="text-gray-500">:</span>
+      <input
+        type="number"
+        min={0}
+        max={59}
+        placeholder="SS"
+        value={secs}
+        onChange={(e) => setSecs(e.target.value)}
+        className="w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-white text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <label className="flex items-center gap-1.5 text-sm text-gray-400 ml-1">
+        <input
+          type="checkbox"
+          checked={estimated}
+          onChange={(e) => setEstimated(e.target.checked)}
+          className="rounded bg-gray-800 border-gray-600"
+        />
+        Est.
+      </label>
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="ml-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 rounded text-sm font-medium transition-colors"
+      >
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------
+// MoveChip
+// ---------------------
 
 function MoveChip({ move, canEdit, saving, onClick }: { move: Move; canEdit: boolean; saving: boolean; onClick: () => void }) {
   const displayName = move.name.replace(/-/g, ' ')
