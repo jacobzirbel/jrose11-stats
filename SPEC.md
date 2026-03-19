@@ -227,22 +227,109 @@ YouTube Data API v3 (free, requires Google API key). The `playlistItems` endpoin
 
 ## 7. Open Questions
 
-| # | Question | Impact |
-|---|---|---|
-| 1 | How does jrose name his tier groups? Custom names, S/A/B/C, or purely positional? | Ranking data model |
-| 2 | Does the full ranked list reshuffle every video, or do new runs just get inserted? | Contributor reorder UX |
-| 3 | What's the contributor guideline for "badge boost glitch played a significant role"? | Data consistency |
-| 4 | Community note accounts — full email or lighter (username only)? | Auth complexity |
-| 5 | Long-term public API goal? Affects early schema decisions. | Architecture |
-| 6 | What is the exact YouTube playlist URL for the Gen 1 series? | Sync setup |
+| # | Question | Status | Resolution |
+|---|---|---|---|
+| 1 | How does jrose name his tier groups? | ✅ Resolved | Color-based groups (exact color names TBD) |
+| 2 | Does the full ranked list reshuffle every video, or do new runs just get inserted? | ✅ Resolved | New runs are inserted into the existing list — no full reshuffle |
+| 3 | What's the contributor guideline for "badge boost glitch played a significant role"? | ✅ Resolved | Subjective — handled via contributor vote per run |
+| 4 | Community note accounts — full email or lighter (username only)? | ✅ Resolved | Username only |
+| 5 | Long-term public API goal? | ✅ Resolved | Yes — public API is a goal; schema should be designed with clean REST exposure in mind from the start |
+| 6 | What is the exact YouTube playlist URL for the Gen 1 series? | ⏳ Pending | Need URL to configure playlist sync |
+
+### Resolution notes
+
+**Tier groups (Q1):** jrose uses color-coded groups. Store group as a `color` string (e.g. `"green"`, `"yellow"`) on each run. The exact color names should be confirmed from the series before the ranking UI is built. Contributors insert new runs into the existing ordered list within the correct color group — no drag-and-drop reorder of the full list needed.
+
+**Badge boost glitch vote (Q3):** Rather than a single contributor making the call, the glitch flag is set by a simple contributor vote — e.g. majority of 3 votes. Admin can override. This keeps it fair and consistent as more contributors join.
+
+**Public API (Q5):** Design the Postgres schema and Next.js routes with public API exposure in mind from day one. Use clean, stable IDs (dex number as primary key for Pokémon, slugs for runs). A `v1` API prefix on routes costs nothing upfront and avoids a painful migration later.
 
 ---
 
-## 8. Seed Data Plan
+## 8. Data Ingestion
 
-A community spreadsheet already tracks **final level** and **completion time** for completed runs. At launch:
-- Import both fields for all completed runs from the existing spreadsheet
-- Gym order, moves, Erika flags, glitch flag, Brock time, and jrose rank must be entered manually by contributors
-- YouTube links + metadata auto-populated via playlist sync
+All Pokémon and move data is seeded once via scripts before launch, then stored in the database. No runtime calls to external APIs for this data. YouTube playlist sync runs on a daily cron.
 
-This minimises cold-start contributor burden — the two most data-dense numeric fields come pre-seeded.
+### 8.1 Source: PokéAPI
+
+Free, no auth required. Rate limit: 100 requests/minute. All three scripts run well within this — ~316 total requests with a small delay between calls.
+
+Base URL: `https://pokeapi.co/api/v2/`
+
+### 8.2 Script 1 — Pokémon base data
+
+**Endpoint:** `pokemon/{id}` for id 1–151
+
+**Extract:**
+- Dex number, name
+- Types (type 1, type 2 if applicable)
+- Base stats: HP, Attack, Defense, Special, Speed (Gen 1 has a single Special stat)
+- Sprite: `sprites.front_default` (modern) and `sprites.versions.generation-i.red-blue.front_default` (Gen 1 pixel art)
+
+**Output:** seeds `pokemon` table (151 rows)
+
+> Note: Gen 1 uses a single Special stat, not Sp. Atk / Sp. Def. PokéAPI returns the split stats for all gens — store both but display the Gen 1 Special stat in the UI.
+
+### 8.3 Script 2 — Gen 1 move learnset
+
+**Depends on:** Script 1 complete
+
+**Endpoint:** `pokemon/{id}` (reuse Script 1 response) → filter `moves` array to `version_group: red-blue` → for each unique move, hit `move/{id}`
+
+**Extract per move:**
+- Name, type, PP, base power
+- Damage class (physical / special / status) — note this reflects Gen 3+ split, not Gen 1 type-based mechanic; flag in UI
+
+**Output:** seeds `moves` table (~165 rows) + `pokemon_moves` join table linking each Pokémon to its learnable moves
+
+This join table is what powers the move typeahead on run entry — when a contributor selects a Pokémon, only that Pokémon's Gen 1 learnable moves appear.
+
+### 8.4 Script 3 — YouTube playlist sync
+
+**Endpoint:** `youtube.googleapis.com/youtube/v3/playlistItems`
+
+**Requires:** Google API key (free), playlist ID (⏳ pending — see Open Questions Q6)
+
+**Extract per video:**
+- Video title, video ID, playlist position, publish date, thumbnail URL
+
+**Pokémon parsing:** extract Pokémon name from video title via regex. jrose's titles are consistent enough for this — flag any that don't parse cleanly for manual contributor review.
+
+**Output:** creates a `stub` Run record per video with YouTube link + Pokémon pre-filled
+
+**Ongoing sync:** runs daily via Vercel cron — picks up new videos automatically and creates new stubs.
+
+### 8.5 Script 4 — Community spreadsheet import
+
+A community spreadsheet already tracks **final level** and **completion time** for completed runs. One-time import at launch:
+- Export spreadsheet as CSV
+- Map rows to Pokémon by dex number or name
+- Populate `final_level` and `completion_time` on matching Run records
+
+**Output:** pre-populates two fields across all completed runs, reducing contributor workload at launch.
+
+### 8.6 Run order
+
+```
+Script 1 (Pokémon)
+    ↓
+Script 2 (Moves — depends on Pokémon records)
+Script 3 (YouTube — independent)
+Script 4 (Spreadsheet import — independent, but run after stubs exist)
+```
+
+---
+
+## 9. Seed Data Plan
+
+See Section 8 for full ingestion detail. Summary of what is pre-seeded vs. manually entered:
+
+| Field | Source |
+|---|---|
+| Pokémon base stats + sprites | PokéAPI Script 1 |
+| Gen 1 learnsets + move data | PokéAPI Script 2 |
+| YouTube links + video metadata | YouTube API Script 3 (ongoing cron) |
+| Final level + completion time | Community spreadsheet Script 4 |
+| Gym order, moves used, Erika flags, glitch flag, Brock time, jrose rank | Manual contributor entry |
+
+This minimises cold-start contributor burden — the most data-dense fields come pre-seeded.
