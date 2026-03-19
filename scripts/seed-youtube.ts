@@ -260,7 +260,7 @@ async function main() {
     for (const result of results) {
       for (const dexNumber of result.dexNumbers) {
         await sql`
-          UPDATE runs SET youtube_url = ${youtubeUrl}
+          UPDATE runs SET youtube_url = ${youtubeUrl}, playlist_position = ${item.position}
           WHERE pokemon_id = ${dexNumber} AND status = 'stub'
         `
         matched++

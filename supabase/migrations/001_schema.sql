@@ -74,7 +74,7 @@ CREATE TABLE runs (
 
   -- YouTube
   youtube_url             TEXT,
-
+  playlist_position       INTEGER,  -- order in jrose11's playlist (0-indexed)
 
   -- Erika flags (independent — both can be true)
   erika_skipped           BOOLEAN,
