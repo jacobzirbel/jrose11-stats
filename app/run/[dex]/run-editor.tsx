@@ -71,11 +71,10 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
   }
 
   const [search, setSearch] = useState('')
-  const filtered = search
-    ? moves.filter((m) => m.name.replace(/-/g, ' ').includes(search.toLowerCase()))
-    : moves
-  const usedMoves = filtered.filter((m) => m.used)
-  const unusedMoves = filtered.filter((m) => !m.used)
+  const usedMoves = moves.filter((m) => m.used)
+  const unusedMoves = moves.filter((m) => !m.used).filter((m) =>
+    search ? m.name.replace(/-/g, ' ').includes(search.toLowerCase()) : true
+  )
 
   return (
     <div className="space-y-8">
