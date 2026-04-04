@@ -34,7 +34,7 @@ export async function Nav() {
               <span className="text-gray-400">
                 {profile.username}
                 <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">
-                  {profile.role.replace('_', ' ')}
+                  {profile.role.replaceAll('_', ' ')}
                 </span>
               </span>
               <SignOutButton />

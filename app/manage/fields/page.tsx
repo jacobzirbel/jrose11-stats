@@ -5,10 +5,12 @@ export default async function FieldsPage() {
   const supabase = await createSupabaseServer()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return <FieldsManager fields={[]} isAdmin={false} />
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   const isAdmin = profile?.role === 'admin'

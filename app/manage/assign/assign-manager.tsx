@@ -41,7 +41,7 @@ export function AssignManager({ runs: initialRuns, contributors }: { runs: Run[]
       .from('runs')
       .update({
         contributor_id: contributorId,
-        status: contributorId ? 'in_progress' : run.status === 'stub' ? 'stub' : run.status,
+        status: contributorId ? 'in_progress' : 'stub',
       })
       .eq('id', run.id)
 
@@ -50,7 +50,7 @@ export function AssignManager({ runs: initialRuns, contributors }: { runs: Run[]
     } else {
       setRuns(runs.map((r) =>
         r.id === run.id
-          ? { ...r, contributor_id: contributorId, status: contributorId ? 'in_progress' : r.status }
+          ? { ...r, contributor_id: contributorId, status: contributorId ? 'in_progress' : 'stub' as string }
           : r
       ))
     }
@@ -89,7 +89,7 @@ export function AssignManager({ runs: initialRuns, contributors }: { runs: Run[]
         <div className="w-24 text-xs text-gray-500 shrink-0">{dexStr}</div>
         <div className="flex-1 text-sm font-medium">{displayName}</div>
         <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${STATUS_COLORS[run.status] ?? 'bg-gray-800 text-gray-400'}`}>
-          {run.status.replace('_', ' ')}
+          {run.status.replaceAll('_', ' ')}
         </span>
         {run.status === 'needs_review' ? (
           <>

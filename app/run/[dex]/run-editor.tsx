@@ -62,6 +62,7 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
 
   async function saveCustomField(defId: number, value: unknown) {
     if (!canEdit) return
+    const prev = customFields
     setCustomFields(customFields.map((f) => f.field_definition_id === defId ? { ...f, value } : f))
     setSaving(`field-${defId}`)
     setError(null)
@@ -70,7 +71,10 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
       .from('custom_field_values')
       .upsert({ run_id: runId, field_definition_id: defId, value })
 
-    if (err) setError(`Failed to save: ${err.message}`)
+    if (err) {
+      setError(`Failed to save: ${err.message}`)
+      setCustomFields(prev)
+    }
     setSaving(null)
   }
 

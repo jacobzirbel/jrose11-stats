@@ -105,7 +105,7 @@ export default async function RunPage({ params }: Props) {
           <h1 className="text-3xl font-bold">{displayName}</h1>
           <div className="text-gray-400">{dexStr} &middot; {pokemon.type1}{pokemon.type2 ? ` / ${pokemon.type2}` : ''}</div>
           <div className="mt-1">
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-300">{run.status.replace('_', ' ')}</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-300">{run.status.replaceAll('_', ' ')}</span>
             {pokemon.is_glitch && <span className="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300 ml-2">glitch</span>}
           </div>
         </div>

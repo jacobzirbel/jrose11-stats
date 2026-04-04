@@ -101,20 +101,12 @@ export function GymOrder({ runId, gymRows, canEdit }: Props) {
         r.gym_number !== null && !LOCKED_POSITIONS.has(r.sequence_position)
       )
 
-    const { error: delErr } = await supabase
-      .from('run_gyms')
-      .delete()
-      .eq('run_id', runId)
-      .not('sequence_position', 'in', `(${Object.values(LOCKED).join(',')})`)
+    const { error: rpcErr } = await supabase.rpc('save_gym_order', {
+      p_run_id: runId,
+      p_gyms: rows,
+    })
 
-    if (delErr) { setError(`Failed to save: ${delErr.message}`); setSaving(false); return }
-
-    if (rows.length > 0) {
-      const { error: insErr } = await supabase
-        .from('run_gyms')
-        .insert(rows.map((r) => ({ run_id: runId, ...r })))
-      if (insErr) { setError(`Failed to save: ${insErr.message}`); setSaving(false); return }
-    }
+    if (rpcErr) { setError(`Failed to save: ${rpcErr.message}`); setSaving(false); return }
 
     setSaving(false)
     setSaved(true)
