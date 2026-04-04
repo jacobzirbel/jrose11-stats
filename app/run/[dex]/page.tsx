@@ -55,6 +55,7 @@ export default async function RunPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   let canEdit = false
   let canMarkDone = false
+  let isAdmin = false
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -62,8 +63,13 @@ export default async function RunPage({ params }: Props) {
       .eq('id', user.id)
       .single()
     if (profile) {
-      canEdit = ['contributor', 'admin'].includes(profile.role)
-      canMarkDone = canEdit && run.status !== 'complete' && run.contributor_id === user.id
+      isAdmin = profile.role === 'admin'
+      canEdit = isAdmin || (
+        profile.role === 'contributor'
+        && run.status === 'in_progress'
+        && run.contributor_id === user.id
+      )
+      canMarkDone = !isAdmin && canEdit
     }
   }
 
@@ -119,9 +125,14 @@ export default async function RunPage({ params }: Props) {
         </div>
       )}
 
-      {!canEdit && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-sm text-gray-400">
-          You are not a contributor, so there isn&apos;t much to see or do here. Check back later!
+      {run.status === 'complete' && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-green-900/20 border border-green-800 text-sm text-green-300">
+          This run is complete.{isAdmin && ' You can still edit as admin.'}
+        </div>
+      )}
+      {run.status === 'needs_review' && !isAdmin && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-800 text-sm text-yellow-300">
+          This run is awaiting admin review.
         </div>
       )}
 
@@ -138,6 +149,7 @@ export default async function RunPage({ params }: Props) {
           canEdit={canEdit}
           status={run.status}
           canMarkDone={canMarkDone}
+          isAdmin={isAdmin}
         />
       </div>
     </main>

@@ -24,16 +24,18 @@ interface Props {
   canEdit: boolean
   status: string
   canMarkDone: boolean
+  isAdmin: boolean
 }
 
 
-export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit, status: initialStatus, canMarkDone }: Props) {
+export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit, status: initialStatus, canMarkDone, isAdmin }: Props) {
   const [moves, setMoves] = useState(initialMoves)
   const [customFields, setCustomFields] = useState(initialCustomFields)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState(initialStatus)
   const [markingDone, setMarkingDone] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
 
   const supabase = createSupabaseBrowser()
 
@@ -93,6 +95,21 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
     setMarkingDone(false)
   }
 
+  async function adminSetStatus(newStatus: 'complete' | 'in_progress') {
+    setReviewing(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('runs')
+      .update({ status: newStatus })
+      .eq('id', runId)
+    if (err) {
+      setError(err.message)
+    } else {
+      setStatus(newStatus)
+    }
+    setReviewing(false)
+  }
+
   const [search, setSearch] = useState('')
   const usedMoves = moves.filter((m) => m.used)
   const unusedMoves = moves.filter((m) => !m.used).filter((m) =>
@@ -107,7 +124,7 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
         </div>
       )}
 
-      {canMarkDone && status !== 'needs_review' && (
+      {canMarkDone && status === 'in_progress' && (
         <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700">
           <span className="text-sm text-gray-400">When you&apos;re finished, mark this run as done for review.</span>
           <button
@@ -119,9 +136,26 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
           </button>
         </div>
       )}
-      {status === 'needs_review' && canMarkDone && (
-        <div className="px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-800 text-sm text-yellow-300">
-          Marked as done — awaiting admin review.
+
+      {isAdmin && status === 'needs_review' && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-800">
+          <span className="text-sm text-yellow-300">This run is awaiting your review.</span>
+          <div className="flex gap-2 shrink-0 ml-4">
+            <button
+              onClick={() => adminSetStatus('in_progress')}
+              disabled={reviewing}
+              className="text-sm px-4 py-1.5 rounded bg-gray-700/50 hover:bg-gray-600/60 text-gray-200 transition-colors disabled:opacity-50"
+            >
+              {reviewing ? '...' : 'Send back'}
+            </button>
+            <button
+              onClick={() => adminSetStatus('complete')}
+              disabled={reviewing}
+              className="text-sm px-4 py-1.5 rounded bg-green-700/50 hover:bg-green-600/60 text-green-200 transition-colors disabled:opacity-50"
+            >
+              {reviewing ? '...' : 'Approve'}
+            </button>
+          </div>
         </div>
       )}
 
