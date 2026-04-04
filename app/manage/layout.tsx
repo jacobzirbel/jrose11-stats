@@ -25,6 +25,7 @@ export default async function ManageLayout({ children }: { children: React.React
       <h1 className="text-2xl font-bold mb-6">Manage</h1>
       <nav className="flex gap-1 mb-8 border-b border-gray-800">
         <TabLink href="/manage/fields">Custom Fields</TabLink>
+        {isAdmin && <TabLink href="/manage/assign">Assign</TabLink>}
         {isAdmin && <TabLink href="/manage/admin">Admin</TabLink>}
       </nav>
       {children}

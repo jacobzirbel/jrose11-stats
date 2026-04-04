@@ -54,6 +54,7 @@ export default async function RunPage({ params }: Props) {
 
   const { data: { user } } = await supabase.auth.getUser()
   let canEdit = false
+  let canMarkDone = false
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -62,6 +63,7 @@ export default async function RunPage({ params }: Props) {
       .single()
     if (profile) {
       canEdit = ['contributor', 'admin'].includes(profile.role)
+      canMarkDone = canEdit && run.status !== 'complete' && run.contributor_id === user.id
     }
   }
 
@@ -134,6 +136,8 @@ export default async function RunPage({ params }: Props) {
           moves={moves}
           customFields={customFields}
           canEdit={canEdit}
+          status={run.status}
+          canMarkDone={canMarkDone}
         />
       </div>
     </main>

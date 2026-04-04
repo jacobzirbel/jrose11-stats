@@ -22,14 +22,18 @@ interface Props {
   moves: Move[]
   customFields: CustomFieldValue[]
   canEdit: boolean
+  status: string
+  canMarkDone: boolean
 }
 
 
-export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit }: Props) {
+export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit, status: initialStatus, canMarkDone }: Props) {
   const [moves, setMoves] = useState(initialMoves)
   const [customFields, setCustomFields] = useState(initialCustomFields)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState(initialStatus)
+  const [markingDone, setMarkingDone] = useState(false)
 
   const supabase = createSupabaseBrowser()
 
@@ -70,6 +74,21 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
     setSaving(null)
   }
 
+  async function markDone() {
+    setMarkingDone(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('runs')
+      .update({ status: 'needs_review' })
+      .eq('id', runId)
+    if (err) {
+      setError(err.message)
+    } else {
+      setStatus('needs_review')
+    }
+    setMarkingDone(false)
+  }
+
   const [search, setSearch] = useState('')
   const usedMoves = moves.filter((m) => m.used)
   const unusedMoves = moves.filter((m) => !m.used).filter((m) =>
@@ -81,6 +100,24 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-2 text-red-300 text-sm">
           {error}
+        </div>
+      )}
+
+      {canMarkDone && status !== 'needs_review' && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700">
+          <span className="text-sm text-gray-400">When you&apos;re finished, mark this run as done for review.</span>
+          <button
+            onClick={markDone}
+            disabled={markingDone}
+            className="text-sm px-4 py-1.5 rounded bg-yellow-700/50 hover:bg-yellow-600/60 text-yellow-200 transition-colors disabled:opacity-50 shrink-0 ml-4"
+          >
+            {markingDone ? '...' : 'Mark done'}
+          </button>
+        </div>
+      )}
+      {status === 'needs_review' && canMarkDone && (
+        <div className="px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-800 text-sm text-yellow-300">
+          Marked as done — awaiting admin review.
         </div>
       )}
 
