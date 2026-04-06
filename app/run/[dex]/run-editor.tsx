@@ -24,17 +24,19 @@ interface Props {
   canEdit: boolean
   status: string
   canMarkDone: boolean
+  canClaim: boolean
   isAdmin: boolean
 }
 
 
-export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit, status: initialStatus, canMarkDone, isAdmin }: Props) {
+export function RunEditor({ runId, moves: initialMoves, customFields: initialCustomFields, canEdit, status: initialStatus, canMarkDone, canClaim, isAdmin }: Props) {
   const [moves, setMoves] = useState(initialMoves)
   const [customFields, setCustomFields] = useState(initialCustomFields)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState(initialStatus)
   const [markingDone, setMarkingDone] = useState(false)
+  const [claiming, setClaiming] = useState(false)
   const [reviewing, setReviewing] = useState(false)
 
   const supabase = createSupabaseBrowser()
@@ -95,6 +97,21 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
     setMarkingDone(false)
   }
 
+  async function claim() {
+    setClaiming(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('runs')
+      .update({ status: 'in_progress', contributor_id: (await supabase.auth.getUser()).data.user?.id })
+      .eq('id', runId)
+    if (err) {
+      setError(err.message)
+    } else {
+      setStatus('in_progress')
+    }
+    setClaiming(false)
+  }
+
   async function adminSetStatus(newStatus: 'complete' | 'in_progress') {
     setReviewing(true)
     setError(null)
@@ -121,6 +138,19 @@ export function RunEditor({ runId, moves: initialMoves, customFields: initialCus
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-2 text-red-300 text-sm">
           {error}
+        </div>
+      )}
+
+      {canClaim && status === 'stub' && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700">
+          <span className="text-sm text-gray-400">This run is unclaimed — claim it to start entering data.</span>
+          <button
+            onClick={claim}
+            disabled={claiming}
+            className="text-sm px-4 py-1.5 rounded bg-blue-700/50 hover:bg-blue-600/60 text-blue-200 transition-colors disabled:opacity-50 shrink-0 ml-4"
+          >
+            {claiming ? '...' : 'Claim run'}
+          </button>
         </div>
       )}
 

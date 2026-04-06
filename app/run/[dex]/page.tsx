@@ -55,6 +55,7 @@ export default async function RunPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   let canEdit = false
   let canMarkDone = false
+  let canClaim = false
   let isAdmin = false
   if (user) {
     const { data: profile } = await supabase
@@ -64,12 +65,18 @@ export default async function RunPage({ params }: Props) {
       .single()
     if (profile) {
       isAdmin = profile.role === 'admin'
-      canEdit = isAdmin || (
+      const isAssignedContributor = (
         profile.role === 'contributor'
         && run.status === 'in_progress'
         && run.contributor_id === user.id
       )
-      canMarkDone = !isAdmin && canEdit
+      canEdit = isAdmin || isAssignedContributor
+      canMarkDone = isAssignedContributor
+      canClaim = (
+        profile.role === 'contributor'
+        && run.status === 'stub'
+        && run.contributor_id === null
+      )
     }
   }
 
@@ -149,6 +156,7 @@ export default async function RunPage({ params }: Props) {
           canEdit={canEdit}
           status={run.status}
           canMarkDone={canMarkDone}
+          canClaim={canClaim}
           isAdmin={isAdmin}
         />
       </div>

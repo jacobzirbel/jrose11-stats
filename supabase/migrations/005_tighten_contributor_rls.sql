@@ -11,17 +11,33 @@
 
 DROP POLICY IF EXISTS "contributors can update runs" ON runs;
 
--- Admins: unrestricted. Contributors: only their assigned in_progress runs.
--- (Contributors also need to set status → needs_review, which is an update on
--- an in_progress run they own, so this covers mark-done.)
+-- USING checks the old row (which rows can be targeted).
+-- WITH CHECK checks the new row (what the row is allowed to become).
+--
+-- Contributors can:
+--   - Edit their assigned in_progress run (USING: in_progress + assigned)
+--   - Claim an unclaimed stub run (USING: stub + no contributor)
+--   - Mark their run done (WITH CHECK: needs_review allowed)
+--
+-- Admins: unrestricted.
 CREATE POLICY "update runs"
   ON runs FOR UPDATE
   USING (
     has_role('admin')
     OR (
       has_role('contributor')
-      AND status = 'in_progress'
+      AND (
+        (status = 'in_progress' AND contributor_id = auth.uid())
+        OR (status = 'stub' AND contributor_id IS NULL)
+      )
+    )
+  )
+  WITH CHECK (
+    has_role('admin')
+    OR (
+      has_role('contributor')
       AND contributor_id = auth.uid()
+      AND status IN ('in_progress', 'needs_review')
     )
   );
 
